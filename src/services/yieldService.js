@@ -11,37 +11,43 @@ async function getPoolsWithYield(token, days = 7, limit = 100) {
   const results = [];
 
   for (const pool of pools) {
-    const tvlNow = Number(pool.totalValueLockedUSD);
-    if (!tvlNow || tvlNow < MIN_TVL_USD) continue;
+    try {
+      const tvlNow = Number(pool.totalValueLockedUSD);
+      if (!tvlNow || tvlNow < MIN_TVL_USD) continue;
 
-    const dayData = await getPoolDayData(pool.id, days);
-    if (!dayData.length) continue;
+      const dayData = await getPoolDayData(pool.id, days);
+      if (!dayData.length) continue;
 
-    let totalFees = 0;
-    let totalTVL = 0;
+      let totalFees = 0;
+      let totalTVL = 0;
 
-    for (const d of dayData) {
-      totalFees += Number(d.feesUSD);
-      totalTVL += Number(d.tvlUSD);
+      for (const d of dayData) {
+        totalFees += Number(d.feesUSD);
+        totalTVL += Number(d.tvlUSD);
+      }
+
+      const avgTVL = totalTVL / dayData.length;
+      if (!avgTVL || avgTVL < MIN_TVL_USD) continue;
+
+      let apr = calculateAPR(totalFees, avgTVL, days);
+      if (!Number.isFinite(apr) || apr <= 0) apr = 0;
+      if (apr > MAX_APR) apr = MAX_APR;
+
+      const apy = calculateAPY(apr);
+
+      results.push({
+        poolId: pool.id,
+        pair: `${pool.token0.symbol}/${pool.token1.symbol}`,
+        feeTier: Number(pool.feeTier),
+        volumeUSD: pool.volumeUSD,
+        tvlUSD: pool.totalValueLockedUSD,
+        apr,
+        apy
+      });
+    } catch (err) {
+      console.error("Pool failed:", pool.id, err.message);
+      continue;
     }
-
-    const avgTVL = totalTVL / dayData.length;
-    if (!avgTVL || avgTVL < MIN_TVL_USD) continue;
-
-    let apr = calculateAPR(totalFees, avgTVL, days);
-    if (!Number.isFinite(apr) || apr <= 0) apr = 0;
-    if (apr > MAX_APR) apr = MAX_APR;
-
-    const apy = calculateAPY(apr);
-
-    results.push({
-      poolId: pool.id,
-      pair: `${pool.token0.symbol}/${pool.token1.symbol}`,
-      volumeUSD: pool.volumeUSD,
-      tvlUSD: pool.totalValueLockedUSD,
-      apr,
-      apy
-    });
   }
 
   return results;

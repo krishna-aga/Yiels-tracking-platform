@@ -16,6 +16,7 @@ const query = gql`
       orderDirection: desc
     ) {
       id
+      feeTier
       volumeUSD
       totalValueLockedUSD
       token0 { symbol }
